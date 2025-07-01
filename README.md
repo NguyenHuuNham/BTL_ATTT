@@ -5,7 +5,7 @@
 Đây là hệ thống chia thành hai server **Upload** và **Download**, dùng để upload, lưu trữ, tải về file MP3 một cách bảo mật (mã hóa, xác thực bằng RSA + AES + chữ ký số).
 
 # **2. Cấu trúc thư mục chuẩn của dự án**
-
+---
 /project-root/
 ├── main.py
 ├── upload_server.py
@@ -31,7 +31,7 @@
 ├── users.json           # Lưu user (nếu có)
 ├── files.json           # Lưu file (nếu có)
 └── README.md            # (Tùy chọn, mô tả dự án)
-
+----
 # 3. Cách hoạt động tổng thể
 
 1. Người dùng tạo User ID (trên trang upload)
