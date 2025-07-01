@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download File - Secure Audio Cloud</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-green-600 via-blue-600 to-purple-600 min-h-screen">
+    <div class="container mx-auto px-6 py-8">
+        <div class="max-w-2xl mx-auto">
+            <h1 class="text-4xl font-bold text-white text-center mb-8">
+                📥 Download File MP3
+            </h1>
+
+            <!-- Available Files -->
+            <div class="bg-white bg-opacity-20 rounded-lg p-6 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4">📁 Files có sẵn</h3>
+                <button id="refreshBtn" class="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    🔄 Refresh
+                </button>
+                <div id="filesList" class="space-y-2">
+                    <div class="text-white opacity-70">Đang tải danh sách files...</div>
+                </div>
+            </div>
+
+            <!-- Download Form -->
+            <div class="bg-white bg-opacity-20 rounded-lg p-6 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4">🔑 Thông tin để Download</h3>
+
+                <div class="mb-4">
+                    <label class="block text-white font-bold mb-2">📁 Tên file:</label>
+                    <input type="text" id="fileNameInput" placeholder="Ví dụ: music.mp3" 
+                           class="w-full px-4 py-2 rounded bg-white bg-opacity-30 text-white placeholder-white placeholder-opacity-70">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-white font-bold mb-2">🔑 Public Key của người upload:</label>
+                    <textarea id="publicKeyInput" placeholder="Dán public key vào đây..." 
+                              class="w-full h-32 px-4 py-2 rounded bg-white bg-opacity-30 text-white placeholder-white placeholder-opacity-70 resize-none"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-white font-bold mb-2">🔐 Encryption Data:</label>
+                    <textarea id="encryptionDataInput" placeholder='Dán JSON encryption data vào đây...' 
+                              class="w-full h-32 px-4 py-2 rounded bg-white bg-opacity-30 text-white placeholder-white placeholder-opacity-70 resize-none"></textarea>
+                </div>
+
+                <button id="downloadBtn" class="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    🔓 Xác thực và Download
+                </button>
+            </div>
+
+            <!-- Progress -->
+            <div id="downloadProgress" class="bg-white bg-opacity-20 rounded-lg p-6 mb-6 hidden">
+                <div class="text-white mb-2">Đang xác thực và giải mã...</div>
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div id="progressBar" class="bg-green-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Result -->
+            <div id="downloadResult" class="bg-white bg-opacity-20 rounded-lg p-6 hidden">
+                <div class="text-green-300 text-lg mb-4">✅ Xác thực thành công!</div>
+                <div class="text-white mb-4">
+                    File đã được giải mã và sẵn sàng tải xuống.
+                </div>
+                <button id="saveFileBtn" class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    💾 Lưu File
+                </button>
+            </div>
+
+            <!-- Error -->
+            <div id="errorDisplay" class="bg-red-500 bg-opacity-20 rounded-lg p-4 text-red-300 hidden"></div>
+
+            <!-- Navigation -->
+            <div class="text-center mt-8">
+                <a href="/upload" class="text-white hover:text-yellow-300">
+                    📤 Đi tới trang Upload
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let downloadedFileData = null;
+        let downloadedFileName = null;
+
+        // Elements
+        const refreshBtn = document.getElementById('refreshBtn');
+        const filesList = document.getElementById('filesList');
+        const fileNameInput = document.getElementById('fileNameInput');
+        const publicKeyInput = document.getElementById('publicKeyInput');
+        const encryptionDataInput = document.getElementById('encryptionDataInput');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadProgress = document.getElementById('downloadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const downloadResult = document.getElementById('downloadResult');
+        const saveFileBtn = document.getElementById('saveFileBtn');
+        const errorDisplay = document.getElementById('errorDisplay');
+
+        // Load files list
+        refreshBtn.addEventListener('click', loadFilesList);
+
+        async function loadFilesList() {
+            try {
+                const response = await fetch('/list_files');
+                const files = await response.json();
+
+                if (files.length === 0) {
+                    filesList.innerHTML = '<div class="text-white opacity-70">Chưa có file nào được upload.</div>';
+                    return;
+                }
+
+                filesList.innerHTML = files.map(file => `
+                    <div class="bg-white bg-opacity-10 rounded p-3 cursor-pointer hover:bg-opacity-20" 
+                         onclick="selectFile('${file.filename}')">
+                        <div class="text-white font-bold">${file.filename}</div>
+                        <div class="text-white opacity-70 text-sm">
+                            User: ${file.user_id} | Size: ${formatFileSize(file.size)} | ${new Date(file.upload_time).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                filesList.innerHTML = '<div class="text-red-300">Lỗi tải danh sách files.</div>';
+            }
+        }
+
+        function selectFile(filename) {
+            fileNameInput.value = filename;
+        }
+
+        // Download
+        downloadBtn.addEventListener('click', () => {
+            const filename = fileNameInput.value.trim();
+            const publicKey = publicKeyInput.value.trim();
+            const encryptionDataText = encryptionDataInput.value.trim();
+
+            if (!filename || !publicKey || !encryptionDataText) {
+                showError('Vui lòng điền đầy đủ thông tin!');
+                return;
+            }
+
+            let encryptionData;
+            try {
+                encryptionData = JSON.parse(encryptionDataText);
+            } catch (error) {
+                showError('Encryption Data không đúng định dạng JSON!');
+                return;
+            }
+
+            downloadFile(filename, publicKey, encryptionData);
+        });
+
+        function downloadFile(filename, publicKey, encryptionData) {
+            downloadProgress.classList.remove('hidden');
+            progressBar.style.width = '30%';
+
+            socket.emit('download_file', {
+                filename: filename,
+                user_public_key: publicKey,
+                encryption_data: encryptionData
+            });
+        }
+
+        // Save file
+        saveFileBtn.addEventListener('click', () => {
+            if (downloadedFileData && downloadedFileName) {
+                const byteCharacters = atob(downloadedFileData);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'audio/mpeg' });
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = downloadedFileName;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        });
+
+        // Socket events
+        socket.on('connected', () => {
+            loadFilesList();
+        });
+
+        socket.on('download_success', (data) => {
+            downloadProgress.classList.add('hidden');
+            downloadResult.classList.remove('hidden');
+
+            downloadedFileData = data.file_data;
+            downloadedFileName = data.filename;
+
+            showSuccess(data.message);
+        });
+
+        socket.on('download_error', (data) => {
+            downloadProgress.classList.add('hidden');
+            showError(data.error);
+        });
+
+        function showError(message) {
+            errorDisplay.textContent = message;
+            errorDisplay.classList.remove('hidden');
+            setTimeout(() => errorDisplay.classList.add('hidden'), 5000);
+        }
+
+        function showSuccess(message) {
+            console.log('✅', message);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Load files on page load
+        loadFilesList();
+    </script>
+</body>
+</html>

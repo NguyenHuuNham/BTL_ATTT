@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload File - Secure Audio Cloud</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 min-h-screen">
+    <div class="container mx-auto px-6 py-8">
+        <div class="max-w-2xl mx-auto">
+            <h1 class="text-4xl font-bold text-white text-center mb-8">
+                🎵 Upload File MP3
+            </h1>
+
+            <!-- User Section -->
+            <div class="bg-white bg-opacity-20 rounded-lg p-6 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4">👤 User ID</h3>
+                <div class="flex gap-4">
+                    <input type="text" id="userId" placeholder="Nhập User ID..." 
+                           class="flex-1 px-4 py-2 rounded bg-white bg-opacity-30 text-white placeholder-white placeholder-opacity-70">
+                    <button id="createUserBtn" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                        Tạo User
+                    </button>
+                </div>
+                <div id="userInfo" class="mt-4 hidden">
+                    <div class="text-green-300 mb-2">✅ User đã sẵn sàng!</div>
+                    <div class="text-white text-sm">
+                        <strong>Public Key:</strong>
+                        <textarea id="publicKeyDisplay" readonly 
+                                  class="w-full h-32 mt-2 p-2 bg-black bg-opacity-30 text-white text-xs rounded resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="bg-white bg-opacity-20 rounded-lg p-6 mb-6">
+                <h3 class="text-xl font-bold text-white mb-4">📁 Chọn File MP3</h3>
+                <div id="uploadArea" class="border-2 border-dashed border-white border-opacity-50 rounded-lg p-8 text-center cursor-pointer hover:bg-white hover:bg-opacity-10">
+                    <input type="file" id="fileInput" accept=".mp3" class="hidden">
+                    <div id="uploadText" class="text-white">
+                        <div class="text-4xl mb-4">📁</div>
+                        <div class="text-lg">Click để chọn file MP3</div>
+                    </div>
+                </div>
+
+                <div id="fileInfo" class="mt-4 hidden">
+                    <div class="text-white">
+                        <div><strong>File:</strong> <span id="fileName"></span></div>
+                        <div><strong>Size:</strong> <span id="fileSize"></span></div>
+                    </div>
+                    <button id="uploadBtn" class="w-full mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        🚀 Upload File
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div id="uploadProgress" class="bg-white bg-opacity-20 rounded-lg p-6 mb-6 hidden">
+                <div class="text-white mb-2">Đang upload...</div>
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div id="progressBar" class="bg-green-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Result -->
+            <div id="uploadResult" class="bg-white bg-opacity-20 rounded-lg p-6 hidden">
+                <div class="text-green-300 text-lg mb-4">✅ Upload thành công!</div>
+                <div class="text-white mb-4">
+                    <strong>Encryption Data (lưu lại để download):</strong>
+                    <textarea id="encryptionDataDisplay" readonly 
+                              class="w-full h-32 mt-2 p-2 bg-black bg-opacity-30 text-white text-sm rounded resize-none"></textarea>
+                </div>
+                <div class="text-yellow-300 text-sm">
+                    💡 Chia sẻ Public Key và Encryption Data cho người muốn download file này!
+                </div>
+            </div>
+
+            <!-- Error -->
+            <div id="errorDisplay" class="bg-red-500 bg-opacity-20 rounded-lg p-4 text-red-300 hidden"></div>
+
+            <!-- Navigation -->
+            <div class="text-center mt-8">
+                <a href="/download" class="text-white hover:text-yellow-300">
+                    📥 Đi tới trang Download
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let selectedFile = null;
+        let currentUserId = null;
+
+        // Elements
+        const userIdInput = document.getElementById('userId');
+        const createUserBtn = document.getElementById('createUserBtn');
+        const userInfo = document.getElementById('userInfo');
+        const publicKeyDisplay = document.getElementById('publicKeyDisplay');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const uploadResult = document.getElementById('uploadResult');
+        const encryptionDataDisplay = document.getElementById('encryptionDataDisplay');
+        const errorDisplay = document.getElementById('errorDisplay');
+
+        // Create user
+        createUserBtn.addEventListener('click', async () => {
+            const userId = userIdInput.value.trim();
+            if (!userId) {
+                showError('Vui lòng nhập User ID!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/create_user/${userId}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                currentUserId = userId;
+                publicKeyDisplay.value = data.public_key;
+                userInfo.classList.remove('hidden');
+                showSuccess(`User ${userId} đã được tạo!`);
+            } catch (error) {
+                showError('Lỗi tạo user: ' + error.message);
+            }
+        });
+
+        // File selection
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (!file.name.toLowerCase().endsWith('.mp3')) {
+                    showError('Chỉ cho phép file MP3!');
+                    return;
+                }
+
+                selectedFile = file;
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.classList.remove('hidden');
+            }
+        });
+
+        // Upload
+        uploadBtn.addEventListener('click', () => {
+            if (!currentUserId) {
+                showError('Vui lòng tạo User ID trước!');
+                return;
+            }
+
+            if (!selectedFile) {
+                showError('Vui lòng chọn file!');
+                return;
+            }
+
+            uploadFile();
+        });
+
+        function uploadFile() {
+            uploadProgress.classList.remove('hidden');
+            progressBar.style.width = '20%';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = e.target.result.split(',')[1]; // Remove data:audio/mpeg;base64,
+
+                progressBar.style.width = '60%';
+
+                socket.emit('upload_file', {
+                    user_id: currentUserId,
+                    filename: selectedFile.name,
+                    file_data: fileData
+                });
+            };
+            reader.readAsDataURL(selectedFile);
+        }
+
+        // Socket events
+        socket.on('upload_success', (data) => {
+            uploadProgress.classList.add('hidden');
+            uploadResult.classList.remove('hidden');
+
+            encryptionDataDisplay.value = JSON.stringify(data.encryption_data, null, 2);
+            showSuccess(data.message);
+        });
+
+        socket.on('upload_error', (data) => {
+            uploadProgress.classList.add('hidden');
+            showError(data.error);
+        });
+
+        function showError(message) {
+            errorDisplay.textContent = message;
+            errorDisplay.classList.remove('hidden');
+            setTimeout(() => errorDisplay.classList.add('hidden'), 5000);
+        }
+
+        function showSuccess(message) {
+            console.log('✅', message);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
