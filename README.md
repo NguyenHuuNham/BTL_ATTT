@@ -5,31 +5,31 @@
 Đây là hệ thống chia thành hai server **Upload** và **Download**, dùng để upload, lưu trữ, tải về file MP3 một cách bảo mật (mã hóa, xác thực bằng RSA + AES + chữ ký số).
 
 # **2. Cấu trúc thư mục chuẩn của dự án**
-/project-root/
-├── main.py
-├── upload_server.py
-├── download_server.py
-├── start_upload_server.py
-├── start_download_server.py
-├── style.css
-├── /templates/
-│   ├── index.html
-│   ├── upload.html
-│   └── download.html
-├── /uploads/
-│   └── ... (các file mp3 đã upload)
-├── /downloads/
-│   └── ... (các file tải về)
-├── /keys/
-│   ├── server_private.pem
-│   ├── server_public.pem
-│   ├── client_private.pem
-│   └── client_public.pem
-├── /shared_data/
-│   └── file_registry.json
-├── users.json      # Lưu user (nếu có)
-├── files.json      # Lưu file (nếu có)
-
+project-root/
+|-- main.py
+|-- upload_server.py
+|-- download_server.py
+|-- start_upload_server.py
+|-- start_download_server.py
+|-- style.css
+|-- templates/
+|   |-- index.html
+|   |-- upload.html
+|   |-- download.html
+|-- uploads/
+|   |-- ... (các file mp3 đã upload)
+|-- downloads/
+|   |-- ... (các file tải về)
+|-- keys/
+|   |-- server_private.pem
+|   |-- server_public.pem
+|   |-- client_private.pem
+|   |-- client_public.pem
+|-- shared_data/
+|   |-- file_registry.json
+|-- users.json      # Lưu user (nếu có)
+|-- files.json      # Lưu file (nếu có)
+|-- README.md       # (Tùy chọn, mô tả dự án)
 
 # 3. Cách hoạt động tổng thể
 
